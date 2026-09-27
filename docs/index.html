@@ -3,363 +3,488 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuickNote — Daily Notes in Your Terminal</title>
+  <title>QuickNote — capture the thought before it's gone</title>
+  <meta name="description" content="An old-school terminal CLI for fast daily notes. Markdown output, zero friction, pure flow.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0b0f19;
-      --bg-2: #111827;
-      --accent: #00d4aa;
-      --accent-2: #0ea5e9;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --danger: #f43f5e;
-      --warn: #fbbf24;
+      --bg: #0b0217;
+      --bg-deep: #070110;
+      --purple: #b197fc;
+      --purple-deep: #7048e8;
+      --green: #4ade80;
+      --green-bright: #86efac;
+      --phosphor: #00ff9d;
+      --text: #d8d2e8;
+      --muted: #7f7396;
+      --border: #2a1f4d;
+      --glow-p: 0 0 24px rgba(177, 151, 252, .25);
+      --glow-g: 0 0 24px rgba(74, 222, 128, .25);
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: 'Inter', sans-serif;
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.6;
+      line-height: 1.65;
       overflow-x: hidden;
     }
-    a { color: var(--accent); text-decoration: none; }
+    ::selection { background: var(--purple-deep); color: #fff; }
+    a { color: var(--phosphor); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    /* Aurora background */
-    .aurora {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
+    /* ── CRT ambiance ─────────────────────────── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 99; pointer-events: none;
+      background: repeating-linear-gradient(0deg,
+        rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px,
+        transparent 1px, transparent 3px);
+      opacity: .5;
+    }
+    .vignette {
+      position: fixed; inset: 0; z-index: 98; pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(7,1,16,.9) 100%);
+    }
+    .bg-glow {
+      position: fixed; inset: 0; z-index: -1;
       background:
-        radial-gradient(circle at 15% 25%, rgba(0,212,170,0.12) 0%, transparent 40%),
-        radial-gradient(circle at 85% 75%, rgba(14,165,233,0.12) 0%, transparent 40%),
-        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+        radial-gradient(600px 400px at 12% 8%, rgba(112,72,232,.16), transparent 70%),
+        radial-gradient(700px 500px at 88% 85%, rgba(0,255,157,.07), transparent 70%),
+        var(--bg);
     }
 
+    /* ── shared bits ──────────────────────────── */
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+    .term-box {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 60px rgba(0,0,0,.55), inset 0 0 60px rgba(112,72,232,.06);
+    }
+    .term-bar {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(177,151,252,.05);
+      font-size: .78rem; color: var(--muted);
+    }
+    .term-bar .title { margin-left: auto; }
+    .k { color: var(--purple); }
+    .g { color: var(--green); }
+    .gb { color: var(--green-bright); }
+    .p { color: var(--phosphor); }
+    .m { color: var(--muted); }
+    .pr { color: var(--phosphor); font-weight: 700; }
+
+    /* ── hero ─────────────────────────────────── */
     header {
-      min-height: 85vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      padding: 4.5rem 0 3rem;
+      display: grid; gap: 2.5rem;
+    }
+    .ascii-logo {
+      font-size: clamp(.32rem, 1.35vw, .85rem);
+      line-height: 1.15;
+      white-space: pre;
       text-align: center;
-      padding: 2rem;
+      color: var(--purple);
+      text-shadow: var(--glow-p);
+      margin: 0;
     }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0.9rem;
-      border-radius: 9999px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
-      font-size: 0.85rem;
-      color: var(--accent);
-      margin-bottom: 1.5rem;
-    }
-    .badge span {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 12px var(--accent);
-    }
+    .hero-head { text-align: center; }
     h1 {
-      font-size: clamp(2.8rem, 7vw, 5.5rem);
-      font-weight: 800;
-      margin: 0 0 1rem;
-      letter-spacing: -0.03em;
-      line-height: 1.05;
-    }
-    h1 em {
-      font-style: normal;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .tagline {
-      font-size: clamp(1.1rem, 2vw, 1.45rem);
-      color: var(--muted);
-      max-width: 620px;
-      margin: 0 auto 2.5rem;
-    }
-    .cta {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .btn {
-      padding: 0.85rem 1.6rem;
-      border-radius: 0.75rem;
-      font-weight: 600;
-      border: 1px solid transparent;
-      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
-      font-size: 1rem;
-    }
-    .btn:hover { transform: translateY(-2px); text-decoration: none; }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #000;
-      box-shadow: 0 8px 32px rgba(0,212,170,0.25);
-    }
-    .btn-primary:hover { box-shadow: 0 12px 40px rgba(0,212,170,0.35); }
-    .btn-secondary {
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      border-color: rgba(255,255,255,0.15);
-    }
-    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
-
-    .terminal {
-      width: min(900px, 95%);
-      margin: 0 auto 4rem;
-      background: #05070a;
-      border-radius: 1rem;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 30px 80px rgba(0,0,0,0.5);
-      overflow: hidden;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .terminal-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      background: rgba(255,255,255,0.03);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot-red { background: #ff5f56; }
-    .dot-yellow { background: #ffbd2e; }
-    .dot-green { background: #27c93f; }
-    .terminal-title { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
-    .terminal-body {
-      padding: 1.5rem;
-      font-size: 0.95rem;
-      line-height: 1.7;
-      white-space: pre-wrap;
-    }
-    .ansi-blue { color: #38bdf8; }
-    .ansi-green { color: #4ade80; }
-    .ansi-cyan { color: #22d3ee; }
-    .ansi-red { color: #fb7185; }
-    .ansi-yellow { color: #facc15; }
-    .ansi-muted { color: #64748b; }
-    .prompt { color: var(--accent); }
-
-    section {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 5rem 2rem;
-    }
-    h2 {
-      font-size: clamp(1.8rem, 4vw, 2.5rem);
-      margin: 0 0 1rem;
+      font-size: clamp(1.6rem, 4.5vw, 2.8rem);
+      margin: .5rem 0 0;
+      letter-spacing: .06em;
+      text-transform: uppercase;
       font-weight: 700;
     }
-    .lead { color: var(--muted); font-size: 1.15rem; max-width: 700px; margin-bottom: 2rem; }
-
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.5rem;
-      margin-top: 2rem;
-    }
-    .card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 1rem;
-      padding: 1.75rem;
-      transition: transform 0.2s, border-color 0.2s, background 0.2s;
-    }
-    .card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(0,212,170,0.25);
-      background: rgba(255,255,255,0.05);
-    }
-    .card-icon {
-      width: 44px; height: 44px;
-      border-radius: 0.75rem;
-      background: linear-gradient(135deg, rgba(0,212,170,0.15), rgba(14,165,233,0.15));
-      display: grid; place-items: center;
-      font-size: 1.4rem;
-      margin-bottom: 1rem;
-    }
-    .card h3 { margin: 0 0 0.5rem; font-size: 1.15rem; }
-    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
-
-    .code-block {
-      background: #05070a;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      overflow-x: auto;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.92rem;
-      margin: 1rem 0 2rem;
-      position: relative;
-    }
-    .code-block::before {
-      content: attr(data-label);
-      position: absolute;
-      top: 0.75rem; right: 1rem;
+    h1 .n { color: var(--green); text-shadow: var(--glow-g); }
+    .tagline {
       color: var(--muted);
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      max-width: 560px;
+      margin: 1.2rem auto 0;
+      font-size: 1.02rem;
     }
-    .code-block code { color: var(--text); }
-    .code-block .sh { color: #4ade80; }
-    .code-block .py { color: #facc15; }
-    .code-block .arg { color: #38bdf8; }
+    .tagline b { color: var(--green-bright); font-weight: 600; }
+    .cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
+    .btn {
+      display: inline-block;
+      padding: .8rem 1.5rem;
+      font-family: inherit; font-size: .95rem; font-weight: 600;
+      letter-spacing: .04em;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: transform .15s, box-shadow .15s, background .15s;
+    }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn-green {
+      background: var(--green);
+      color: #04170b;
+      box-shadow: 0 0 24px rgba(74,222,128,.35);
+    }
+    .btn-green:hover { box-shadow: 0 0 36px rgba(74,222,128,.5); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--purple);
+      border: 1px solid var(--purple-deep);
+    }
+    .btn-ghost:hover { background: rgba(177,151,252,.09); box-shadow: var(--glow-p); }
 
-    .commands {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin: 1.5rem 0;
-    }
-    .pill {
-      padding: 0.5rem 1rem;
-      border-radius: 9999px;
-      background: rgba(0,212,170,0.1);
-      border: 1px solid rgba(0,212,170,0.2);
-      color: var(--accent);
+    /* ── demo terminal ────────────────────────── */
+    .demo { border-radius: 8px; overflow: hidden; }
+    .demo-body {
+      padding: 1.4rem 1.5rem;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.9rem;
+      font-size: clamp(.72rem, 1.6vw, .92rem);
+      line-height: 1.8;
+      min-height: 320px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .cursor {
+      display: inline-block;
+      width: .55em; height: 1.1em;
+      background: var(--phosphor);
+      vertical-align: text-bottom;
+      box-shadow: 0 0 10px rgba(0,255,157,.8);
+      animation: blink 1.05s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── sections ─────────────────────────────── */
+    section { padding: 4rem 0; }
+    .sec-head {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 1.25rem;
+      color: var(--purple);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .sec-head::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--purple-deep), transparent); }
+    .sec-head .num { color: var(--green); }
+    .lead { color: var(--muted); max-width: 680px; margin: 0 0 2rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+    .feature {
+      padding: 1.4rem 1.5rem;
+      position: relative;
+      transition: border-color .2s, transform .2s, box-shadow .2s;
+    }
+    .feature:hover {
+      border-color: var(--purple-deep);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(112,72,232,.15);
+    }
+    .feature .glyph { font-size: 1.3rem; color: var(--green); text-shadow: var(--glow-g); }
+    .feature h3 { margin: .4rem 0 .4rem; font-size: 1.02rem; color: var(--green-bright); letter-spacing: .03em; }
+    .feature p { margin: 0; color: var(--muted); font-size: .88rem; }
+    .feature code { color: var(--purple); }
+
+    /* ── markdown showcase ────────────────────── */
+    .md-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 720px) { .md-grid { grid-template-columns: 1fr; } }
+    .md-pane .term-bar .title { color: var(--green); }
+    .md-pane .body { padding: 1.2rem 1.4rem; font-size: .85rem; white-space: pre-wrap; }
+    .arrow {
+      display: grid; place-items: center;
+      color: var(--purple);
+      font-size: 1.4rem;
+      text-shadow: var(--glow-p);
+    }
+    @media (max-width: 720px) { .arrow { padding: .25rem; transform: rotate(90deg); } }
+
+    /* ── commands table ────────────────────────── */
+    .cmd-row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 1rem;
+      padding: .85rem 1.25rem;
+      border-bottom: 1px dashed var(--border);
+      align-items: baseline;
+    }
+    @media (max-width: 560px) { .cmd-row { grid-template-columns: 1fr; gap: .15rem; } }
+    .cmd-row:last-child { border-bottom: none; }
+    .cmd-name { color: var(--phosphor); font-weight: 700; text-shadow: 0 0 8px rgba(0,255,157,.5); }
+    .cmd-desc { color: var(--muted); font-size: .88rem; }
+
+    /* ── install ──────────────────────────────── */
+    .code-block {
+      padding: 1.3rem 1.5rem;
+      font-size: .9rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .code-block .c1 { color: var(--green); }
+    .code-block .c2 { color: var(--purple); }
+    .code-block .c3 { color: var(--phosphor); }
+    .reqs { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.25rem 0 0; }
+    .req-pill {
+      padding: .35rem .85rem;
+      border: 1px solid var(--purple-deep);
+      border-radius: 999px;
+      color: var(--purple);
+      font-size: .8rem;
     }
 
+    /* ── outro / footer ───────────────────────── */
+    .outro {
+      text-align: center;
+      padding: 5rem 1.5rem;
+      border-top: 1px solid var(--border);
+      background: linear-gradient(180deg, transparent, rgba(112,72,232,.08));
+    }
+    .outro h2 {
+      font-size: clamp(1.3rem, 3.2vw, 2rem);
+      margin: 0 0 .75rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--green-bright);
+      text-shadow: var(--glow-g);
+    }
+    .outro p { color: var(--muted); margin: 0 0 2rem; }
     footer {
       text-align: center;
-      padding: 4rem 2rem;
+      padding: 2rem 1.5rem 3rem;
       color: var(--muted);
-      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: .8rem;
+      border-top: 1px dashed var(--border);
     }
-    .heart { color: var(--danger); }
+    footer .h { color: var(--purple); }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .btn:hover { transform: none; }
-      .card:hover { transform: none; }
+      .btn:hover, .feature:hover { transform: none; }
+      .cursor { animation: none; }
     }
   </style>
 </head>
 <body>
-  <div class="aurora"></div>
+  <div class="bg-glow"></div>
+  <div class="vignette"></div>
+  <div class="scanlines"></div>
 
-  <header>
-    <div class="badge"><span></span> Python CLI for note-takers</div>
-    <h1>Quick<em>Note</em></h1>
-    <p class="tagline">A fast, interactive terminal app for daily notes. Write once, recall instantly, stay in flow.</p>
-    <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/staffordlumsden/Quicknote">View on GitHub</a>
-      <a class="btn btn-secondary" href="#install">Install</a>
+  <header class="wrap">
+    <pre class="ascii-logo" aria-hidden="true">
+ ██████    ██  ██████  ██     ██ ██   ██            ██
+██   ██    ██ ██   ██ ██     ██ ██   ██           ███
+███████    ██ ██████  ██  ██  ██ ███████  ██████   ██
+██   ██ ██ ██ ██      ███████  ██   ██            ██
+██   ██  ███  ██████      ██   ██   ██            ██
+                       █████</pre>
+    <div class="hero-head">
+      <h1><span class="k">Quick</span><span class="n">Note</span></h1>
+      <p class="tagline">
+        The thought arrives. The thought escapes. <b>QuickNote is the net.</b><br>
+        One keystroke, zero friction, pure flow — right in your terminal.
+      </p>
+      <div class="cta">
+        <a class="btn btn-green" href="#install">$ install now_</a>
+        <a class="btn btn-ghost" href="https://github.com/staffordlumsden/Quicknote">view source on github</a>
+      </div>
+    </div>
+
+    <div class="term-box demo">
+      <div class="term-bar">
+        <span class="m">●</span><span class="m">●</span><span class="m">●</span>
+        <span class="title">quicknote — ~/.quicknote/Notes/Daily</span>
+      </div>
+      <div class="demo-body" id="demo-body" aria-label="QuickNote terminal demo">
+<span class="k">  Welcome to QuickNote v1.2</span>
+<span class="m">  A simple interactive CLI for taking daily notes.</span>
+
+<span class="pr">&gt;</span> <span id="typed"></span><span class="cursor"></span>
+      </div>
     </div>
   </header>
 
-  <div class="terminal">
-    <div class="terminal-header">
-      <div class="dot dot-red"></div>
-      <div class="dot dot-yellow"></div>
-      <div class="dot dot-green"></div>
-      <div class="terminal-title">quicknote</div>
+  <section class="wrap" id="features">
+    <div class="sec-head"><span class="num">01</span> why quicknote</div>
+    <p class="lead">Note apps want accounts, sync plans, and your calendar. QuickNote wants nothing but a terminal and a thought worth keeping.</p>
+    <div class="grid">
+      <div class="term-box feature">
+        <div class="glyph">⚡</div>
+        <h3>Capture in seconds</h3>
+        <p>Run <code>quicknote</code>, type, hit <code>Esc+Enter</code>. The thought is saved with a timestamp before you lose it. That's the whole loop.</p>
+      </div>
+      <div class="term-box feature">
+        <div class="glyph">📅</div>
+        <h3>One file per day</h3>
+        <p>Every note lands in <code>~/.quicknote/Notes/Daily/YYYY-MM-DD.md</code> — today's brain, one file, timestamped line by line.</p>
+      </div>
+      <div class="term-box feature">
+        <div class="glyph">📝</div>
+        <h3>Pure Markdown</h3>
+        <p>Output is portable, greppable, future-proof Markdown. Your notes belong to you — not a walled garden.</p>
+      </div>
+      <div class="term-box feature">
+        <div class="glyph">🖥️</div>
+        <h3>Old-school, deliberately</h3>
+        <p>Figlet banner, phosphor panels, terminal-native UX built on <code>rich</code> and <code>prompt_toolkit</code>. Retro is a feature.</p>
+      </div>
+      <div class="term-box feature">
+        <div class="glyph">📱</div>
+        <h3>Desktop &amp; Termux</h3>
+        <p>Born on a phone. Runs wherever Python 3 runs — macOS, Linux, or Android via Termux.</p>
+      </div>
+      <div class="term-box feature">
+        <div class="glyph">🔓</div>
+        <h3>Zero lock-in</h3>
+        <p>Plain files, open source, no accounts, no telemetry, no subscription. Fork it and make it yours.</p>
+      </div>
     </div>
-    <div class="terminal-body"><span class="ansi-blue">    ___        _      _   _             _   
-   / _ \ _   _| |_ __| | | | ___   __ _| |_ 
-  | | | | | | | __/ _` | | |/ _ \ / _` | __|
-  | |_| | |_| | || (_| | | | (_) | (_| | |_ 
-   \__\_\\__,_|\__\__,_| |_|\___/ \__,_|\__|</span>
+  </section>
 
-<span class="ansi-green">A simple interactive CLI for taking daily notes.</span>
+  <section class="wrap" id="markdown">
+    <div class="sec-head"><span class="num">02</span> typed in the terminal, kept as markdown</div>
+    <p class="lead">What you see is a CLI. What you keep is clean Markdown that plays nicely with Obsidian, VS Code, grep, or paper.</p>
+    <div class="md-grid">
+      <div class="term-box md-pane">
+        <div class="term-bar"><span class="m">●</span><span class="m">●</span><span class="m">●</span><span class="title">you type</span></div>
+        <div class="body"><span class="pr">&gt;</span> call the registrar re: unit outlines
+<span class="pr">&gt;</span> **exam period:** 10–21 Nov — draft questions
+<span class="pr">&gt;</span> remember: *marking meeting Thursday*
 
-<span class="ansi-muted">Type /today to display today's note. Type /exit to quit.</span>
-
-<span class="prompt">&gt;</span> Finalise the lecture outline <span class="ansi-muted">(Esc + Enter to save)</span>
-<span class="ansi-green">✅ Note saved to: ~/.quicknote/Notes/Daily/2026-09-28.md</span>
-
-<span class="prompt">&gt;</span> <span class="ansi-yellow">/today</span>
-<span class="ansi-cyan">📝 2026-09-28</span>
-- 07:45 Finalise the lecture outline
-
-<span class="prompt">&gt;</span> <span class="ansi-red">/exit</span>
-<span class="ansi-blue">Goodbye!</span>
+<span class="m">(Esc + Enter)</span></div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="term-box md-pane">
+        <div class="term-bar"><span class="m">●</span><span class="m">●</span><span class="m">●</span><span class="title">2026-09-28.md</span></div>
+        <div class="body"><span class="m"># ── saved ──</span>
+- 07:52 call the registrar re: unit outlines
+- 07:53 <span class="k">**exam period:**</span> 10–21 Nov — draft questions
+- 07:54 remember: <span class="g">*marking meeting Thursday*</span></div>
+      </div>
     </div>
+  </section>
+
+  <section class="wrap" id="commands">
+    <div class="sec-head"><span class="num">03</span> the whole manual</div>
+    <p class="lead">Four commands. That's the entire vocabulary between you and your notes.</p>
+    <div class="term-box">
+      <div class="cmd-row"><span class="cmd-name">/today</span><span class="cmd-desc">Print today's note file right back at you, in a glowing cyan panel.</span></div>
+      <div class="cmd-row"><span class="cmd-name">/exit &nbsp;·&nbsp; /quit</span><span class="cmd-desc">Say goodbye. The banner waves back (in green).</span></div>
+      <div class="cmd-row"><span class="cmd-name">Ctrl+D</span><span class="cmd-desc">The classic. Exits with dignity.</span></div>
+      <div class="cmd-row"><span class="cmd-name">anything else</span><span class="cmd-desc">Becomes a timestamped Markdown note. Yes, even multi-line. Especially multi-line.</span></div>
+    </div>
+  </section>
+
+  <section class="wrap" id="install">
+    <div class="sec-head"><span class="num">04</span> install</div>
+    <p class="lead">Sixty seconds from clone to your first note. The setup script builds a local venv and a launcher.</p>
+    <div class="term-box">
+      <div class="term-bar"><span class="m">●</span><span class="m">●</span><span class="m">●</span><span class="title">bash</span></div>
+      <div class="code-block"><span class="c1">$</span> <span class="c3">git clone</span> https://github.com/staffordlumsden/Quicknote.git
+<span class="c1">$</span> <span class="c3">cd</span> Quicknote
+<span class="c1">$</span> <span class="c3">./setup.sh</span>
+<span class="m">🚀 venv created · deps installed · launcher ready</span>
+<span class="c1">$</span> <span class="c3">export PATH</span>="$PWD/bin:$PATH"
+<span class="c1">$</span> <span class="c2">quicknote</span>   <span class="m"># ← your first note starts here</span></div>
+    </div>
+    <div class="reqs">
+      <span class="req-pill">python3</span>
+      <span class="req-pill">rich</span>
+      <span class="req-pill">prompt_toolkit</span>
+      <span class="req-pill">pyfiglet</span>
+      <span class="req-pill">♥</span>
+    </div>
+  </section>
+
+  <div class="outro">
+    <h2>The thought is already fading. Type faster.</h2>
+    <p>Open source, MIT-hearted, and waiting in your terminal.</p>
+    <a class="btn btn-green" href="https://github.com/staffordlumsden/Quicknote">★ star it on github</a>
   </div>
 
-  <section id="features">
-    <h2>Why QuickNote?</h2>
-    <p class="lead">No accounts, no cloud sync, no friction. Just open a terminal, dump your thoughts, and get back to work.</p>
-    <div class="features">
-      <div class="card">
-        <div class="card-icon">⚡</div>
-        <h3>Blazingly simple</h3>
-        <p>One command opens the prompt. Multi-line input, Esc+Enter to save, done.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">🎨</div>
-        <h3>Terminal-native UI</h3>
-        <p>Built with Rich and prompt_toolkit — figlet banner, panels, and friendly colours.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">📅</div>
-        <h3>Daily markdown files</h3>
-        <p>Notes are saved to <code>~/.quicknote/Notes/Daily/YYYY-MM-DD.md</code> as plain, portable Markdown.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔌</div>
-        <h3>Works on desktop & Termux</h3>
-        <p>Designed for Linux/macOS terminals and Android/Termux environments alike.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="commands">
-    <h2>Built-in commands</h2>
-    <p class="lead">A tiny vocabulary that covers daily use.</p>
-    <div class="commands">
-      <span class="pill">/today</span>
-      <span class="pill">/exit</span>
-      <span class="pill">/quit</span>
-      <span class="pill">Ctrl + D</span>
-    </div>
-  </section>
-
-  <section id="install">
-    <h2>Get it running</h2>
-    <p class="lead">Clone the repo, run the setup script, and add the launcher to your PATH.</p>
-
-    <div class="code-block" data-label="bash">
-      <code><span class="sh">git clone</span> <span class="arg">https://github.com/staffordlumsden/Quicknote.git</span><br>
-<span class="sh">cd</span> <span class="arg">Quicknote</span><br>
-<span class="sh">./setup.sh</span><br>
-<span class="sh">export</span> <span class="arg">PATH="$PWD/bin:$PATH"</span><br>
-<span class="py">quicknote</span></code>
-    </div>
-
-    <h3>Requirements</h3>
-    <ul>
-      <li>Python 3</li>
-      <li><code>rich</code></li>
-      <li><code>prompt_toolkit</code></li>
-      <li><code>pyfiglet</code></li>
-    </ul>
-    <p>The setup script installs them automatically into a local virtual environment.</p>
-  </section>
-
-  <section id="about">
-    <h2>Open source</h2>
-    <p class="lead">QuickNote is a small, public project for anyone who lives in a terminal. Contributions, forks, and issue reports are welcome.</p>
-    <a class="btn btn-secondary" href="https://github.com/staffordlumsden/Quicknote">Open GitHub repository →</a>
-  </section>
-
   <footer>
-    <p>Made with <span class="heart">♥</span> by Stafford Lumsden · <a href="https://github.com/staffordlumsden/Quicknote">github.com/staffordlumsden/Quicknote</a></p>
+    <p><span class="h">QuickNote</span> · built in a terminal, for terminals · <a href="https://github.com/staffordlumsden/Quicknote">staffordlumsden/Quicknote</a></p>
   </footer>
+
+  <script>
+    (function () {
+      var script = [
+        { text: "finalise the lecture outline before the 9am meeting", cls: "" },
+        { delay: 900, out: "\n✅ saved → ~/.quicknote/Notes/Daily/2026-09-28.md", outCls: "g" },
+        { delay: 700, clear: true },
+        { text: "/today", cls: "" },
+        { delay: 500, out: "\n📝 2026-09-28", outCls: "k" },
+        { out: "- 07:52 finalise the lecture outline before the 9am meeting", outCls: "m" },
+        { delay: 1200, clear: true },
+        { text: "/exit", cls: "" },
+        { delay: 500, out: "\nGoodbye! 🦞", outCls: "g" },
+        { delay: 1600, restart: true }
+      ];
+
+      var typedEl = document.getElementById('typed');
+      var bodyEl = document.getElementById('demo-body');
+      var staticHTML = bodyEl.innerHTML.replace(/<span id="typed"><\/span><span class="cursor"><\/span>\s*$/, '');
+      if (staticHTML === bodyEl.innerHTML) {
+        staticHTML = '<span class="k">  Welcome to QuickNote v1.2</span>\n<span class="m">  A simple interactive CLI for taking daily notes.</span>\n\n<span class="pr">&gt;</span> ';
+      }
+
+      function reset() {
+        bodyEl.innerHTML = '<span class="k">  Welcome to QuickNote v1.2</span>\n<span class="m">  A simple interactive CLI for taking daily notes.</span>\n\n<span class="pr">&gt;</span> <span id="typed"></span><span class="cursor"></span>';
+        typedEl = document.getElementById('typed');
+        typedEl.textContent = '';
+        step(0);
+      }
+
+      function step(i) {
+        if (i >= script.length) { setTimeout(reset, 2200); return; }
+        var s = script[i];
+        if (s.restart) { setTimeout(reset, s.delay || 800); return; }
+        if (s.clear) {
+          setTimeout(function () {
+            typedEl.textContent = '';
+            var lines = typedEl.previousSibling;
+            step(i + 1);
+          }, s.delay || 600);
+          return;
+        }
+        if (s.text) {
+          var c = 0;
+          (function typeChar() {
+            if (c <= s.text.length) {
+              typedEl.textContent = s.text.slice(0, c++);
+              setTimeout(typeChar, 34 + Math.random() * 40);
+            } else {
+              setTimeout(function () { step(i + 1); }, 400);
+            }
+          })();
+        } else if (s.out) {
+          setTimeout(function () {
+            var span = document.createElement('span');
+            if (s.outCls) span.className = s.outCls;
+            span.textContent = s.out;
+            bodyEl.insertBefore(document.createTextNode(''), typedEl ? typedEl.parentNode : null);
+            // append output line after the prompt line
+            var promptLine = typedEl.parentNode;
+            var outLine = document.createElement('div');
+            var inner = document.createElement('span');
+            if (s.outCls) inner.className = s.outCls;
+            inner.textContent = s.out;
+            outLine.appendChild(inner);
+            bodyEl.insertBefore(outLine, promptLine.nextSibling);
+            step(i + 1);
+          }, s.delay || 500);
+        }
+      }
+
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        // Static demo for reduced motion
+        bodyEl.innerHTML = '<span class="k">  Welcome to QuickNote v1.2</span>\n<span class="m">  A simple interactive CLI for taking daily notes.</span>\n\n<span class="pr">&gt;</span> finalise the lecture outline before the 9am meeting\n<span class="g">✅ saved → ~/.quicknote/Notes/Daily/2026-09-28.md</span>\n\n<span class="pr">&gt;</span> <span class="k">/today</span>\n<span class="k">📝 2026-09-28</span>\n<span class="m">- 07:52 finalise the lecture outline before the 9am meeting</span>';
+      } else {
+        reset();
+      }
+    })();
+  </script>
 </body>
 </html>
