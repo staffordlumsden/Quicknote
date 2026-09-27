@@ -1,0 +1,3 @@
+#!/bin/bash
+# This script acts as a launcher to bypass noexec restrictions on /sdcard
+"/Users/stlu5334/Quicknote/venv/bin/python" "/Users/stlu5334/Quicknote/quick_note_interactive.py" ""
