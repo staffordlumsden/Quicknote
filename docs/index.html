@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuickNote — Daily Notes in Your Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --bg-2: #111827;
+      --accent: #00d4aa;
+      --accent-2: #0ea5e9;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --danger: #f43f5e;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Aurora background */
+    .aurora {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(circle at 15% 25%, rgba(0,212,170,0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 75%, rgba(14,165,233,0.12) 0%, transparent 40%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    }
+
+    header {
+      min-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 0.85rem;
+      color: var(--accent);
+      margin-bottom: 1.5rem;
+    }
+    .badge span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+    h1 {
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 800;
+      margin: 0 0 1rem;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .tagline {
+      font-size: clamp(1.1rem, 2vw, 1.45rem);
+      color: var(--muted);
+      max-width: 620px;
+      margin: 0 auto 2.5rem;
+    }
+    .cta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      padding: 0.85rem 1.6rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+      font-size: 1rem;
+    }
+    .btn:hover { transform: translateY(-2px); text-decoration: none; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #000;
+      box-shadow: 0 8px 32px rgba(0,212,170,0.25);
+    }
+    .btn-primary:hover { box-shadow: 0 12px 40px rgba(0,212,170,0.35); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border-color: rgba(255,255,255,0.15);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    .terminal {
+      width: min(900px, 95%);
+      margin: 0 auto 4rem;
+      background: #05070a;
+      border-radius: 1rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+      overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    .terminal-title { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+    .terminal-body {
+      padding: 1.5rem;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .ansi-blue { color: #38bdf8; }
+    .ansi-green { color: #4ade80; }
+    .ansi-cyan { color: #22d3ee; }
+    .ansi-red { color: #fb7185; }
+    .ansi-yellow { color: #facc15; }
+    .ansi-muted { color: #64748b; }
+    .prompt { color: var(--accent); }
+
+    section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 5rem 2rem;
+    }
+    h2 {
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      margin: 0 0 1rem;
+      font-weight: 700;
+    }
+    .lead { color: var(--muted); font-size: 1.15rem; max-width: 700px; margin-bottom: 2rem; }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 1rem;
+      padding: 1.75rem;
+      transition: transform 0.2s, border-color 0.2s, background 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(0,212,170,0.25);
+      background: rgba(255,255,255,0.05);
+    }
+    .card-icon {
+      width: 44px; height: 44px;
+      border-radius: 0.75rem;
+      background: linear-gradient(135deg, rgba(0,212,170,0.15), rgba(14,165,233,0.15));
+      display: grid; place-items: center;
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+    }
+    .card h3 { margin: 0 0 0.5rem; font-size: 1.15rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+    .code-block {
+      background: #05070a;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.92rem;
+      margin: 1rem 0 2rem;
+      position: relative;
+    }
+    .code-block::before {
+      content: attr(data-label);
+      position: absolute;
+      top: 0.75rem; right: 1rem;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .code-block code { color: var(--text); }
+    .code-block .sh { color: #4ade80; }
+    .code-block .py { color: #facc15; }
+    .code-block .arg { color: #38bdf8; }
+
+    .commands {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .pill {
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      background: rgba(0,212,170,0.1);
+      border: 1px solid rgba(0,212,170,0.2);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .heart { color: var(--danger); }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .btn:hover { transform: none; }
+      .card:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora"></div>
+
+  <header>
+    <div class="badge"><span></span> Python CLI for note-takers</div>
+    <h1>Quick<em>Note</em></h1>
+    <p class="tagline">A fast, interactive terminal app for daily notes. Write once, recall instantly, stay in flow.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/staffordlumsden/Quicknote">View on GitHub</a>
+      <a class="btn btn-secondary" href="#install">Install</a>
+    </div>
+  </header>
+
+  <div class="terminal">
+    <div class="terminal-header">
+      <div class="dot dot-red"></div>
+      <div class="dot dot-yellow"></div>
+      <div class="dot dot-green"></div>
+      <div class="terminal-title">quicknote</div>
+    </div>
+    <div class="terminal-body"><span class="ansi-blue">    ___        _      _   _             _   
+   / _ \ _   _| |_ __| | | | ___   __ _| |_ 
+  | | | | | | | __/ _` | | |/ _ \ / _` | __|
+  | |_| | |_| | || (_| | | | (_) | (_| | |_ 
+   \__\_\\__,_|\__\__,_| |_|\___/ \__,_|\__|</span>
+
+<span class="ansi-green">A simple interactive CLI for taking daily notes.</span>
+
+<span class="ansi-muted">Type /today to display today's note. Type /exit to quit.</span>
+
+<span class="prompt">&gt;</span> Finalise the lecture outline <span class="ansi-muted">(Esc + Enter to save)</span>
+<span class="ansi-green">✅ Note saved to: ~/.quicknote/Notes/Daily/2026-09-28.md</span>
+
+<span class="prompt">&gt;</span> <span class="ansi-yellow">/today</span>
+<span class="ansi-cyan">📝 2026-09-28</span>
+- 07:45 Finalise the lecture outline
+
+<span class="prompt">&gt;</span> <span class="ansi-red">/exit</span>
+<span class="ansi-blue">Goodbye!</span>
+    </div>
+  </div>
+
+  <section id="features">
+    <h2>Why QuickNote?</h2>
+    <p class="lead">No accounts, no cloud sync, no friction. Just open a terminal, dump your thoughts, and get back to work.</p>
+    <div class="features">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>Blazingly simple</h3>
+        <p>One command opens the prompt. Multi-line input, Esc+Enter to save, done.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎨</div>
+        <h3>Terminal-native UI</h3>
+        <p>Built with Rich and prompt_toolkit — figlet banner, panels, and friendly colours.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📅</div>
+        <h3>Daily markdown files</h3>
+        <p>Notes are saved to <code>~/.quicknote/Notes/Daily/YYYY-MM-DD.md</code> as plain, portable Markdown.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔌</div>
+        <h3>Works on desktop & Termux</h3>
+        <p>Designed for Linux/macOS terminals and Android/Termux environments alike.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="commands">
+    <h2>Built-in commands</h2>
+    <p class="lead">A tiny vocabulary that covers daily use.</p>
+    <div class="commands">
+      <span class="pill">/today</span>
+      <span class="pill">/exit</span>
+      <span class="pill">/quit</span>
+      <span class="pill">Ctrl + D</span>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Get it running</h2>
+    <p class="lead">Clone the repo, run the setup script, and add the launcher to your PATH.</p>
+
+    <div class="code-block" data-label="bash">
+      <code><span class="sh">git clone</span> <span class="arg">https://github.com/staffordlumsden/Quicknote.git</span><br>
+<span class="sh">cd</span> <span class="arg">Quicknote</span><br>
+<span class="sh">./setup.sh</span><br>
+<span class="sh">export</span> <span class="arg">PATH="$PWD/bin:$PATH"</span><br>
+<span class="py">quicknote</span></code>
+    </div>
+
+    <h3>Requirements</h3>
+    <ul>
+      <li>Python 3</li>
+      <li><code>rich</code></li>
+      <li><code>prompt_toolkit</code></li>
+      <li><code>pyfiglet</code></li>
+    </ul>
+    <p>The setup script installs them automatically into a local virtual environment.</p>
+  </section>
+
+  <section id="about">
+    <h2>Open source</h2>
+    <p class="lead">QuickNote is a small, public project for anyone who lives in a terminal. Contributions, forks, and issue reports are welcome.</p>
+    <a class="btn btn-secondary" href="https://github.com/staffordlumsden/Quicknote">Open GitHub repository →</a>
+  </section>
+
+  <footer>
+    <p>Made with <span class="heart">♥</span> by Stafford Lumsden · <a href="https://github.com/staffordlumsden/Quicknote">github.com/staffordlumsden/Quicknote</a></p>
+  </footer>
+</body>
+</html>
